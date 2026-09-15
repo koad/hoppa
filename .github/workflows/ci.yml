@@ -1,0 +1,126 @@
+name: CI
+
+# Minute usage is free on standard GitHub-hosted runners for public repos, but
+# cache/artifact STORAGE is still metered — see the artifact step below.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  game:
+    name: Build and test HOPPA
+    # Standard runner on purpose: "larger runners" are billed even for public
+    # repositories, so using one would quietly cost money.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 detects ESM in .js files, so `node --check` can cover the entry
+          # files as well as the plain-script modules.
+          node-version: '22'
+
+      # Cheap gate, first. A duplicate `const` inside one function took the whole
+      # client bundle out and presented as a blank page — a 60-second browser test
+      # is the expensive way to learn that.
+      - name: Syntax check every source file
+        run: |
+          for f in src/client/*.js src/server/*.js src/both/*.js tools/*.mjs; do
+            node --check "$f" || exit 1
+          done
+          echo "all sources parse"
+
+      # This is the property that makes CI possible at all: the app must build
+      # from published packages, not from anything that only exists on one machine.
+      - name: Assert no local-package dependency
+        run: |
+          if [ -n "${METEOR_PACKAGE_DIRS:-}" ]; then
+            echo "::error::METEOR_PACKAGE_DIRS is set — CI must not depend on local packages"
+            exit 1
+          fi
+          echo "METEOR_PACKAGE_DIRS unset — building from published packages only"
+
+      - name: Icons are reproducible from source
+        run: |
+          node tools/make-icons.mjs
+          if ! git diff --quiet -- src/public/icons; then
+            echo "::error::committed icons differ from what make-icons.mjs generates"
+            git diff --stat -- src/public/icons
+            exit 1
+          fi
+          echo "icons match their source"
+
+      - name: Install Meteor
+        run: |
+          curl -fsSL --retry 5 --retry-delay 2 https://install.meteor.com/ | sh
+          echo "$HOME/.meteor" >> "$GITHUB_PATH"
+
+      - name: Install app dependencies
+        working-directory: src
+        run: meteor npm install
+
+      - name: Start the app
+        working-directory: src
+        run: |
+          nohup meteor run --port 3000 > /tmp/meteor.log 2>&1 &
+          for i in $(seq 1 150); do
+            grep -q "App running at" /tmp/meteor.log && break
+            sleep 2
+          done
+          if ! grep -q "App running at" /tmp/meteor.log; then
+            echo "::error::the app never reported that it was running"
+            tail -60 /tmp/meteor.log
+            exit 1
+          fi
+          tail -3 /tmp/meteor.log
+          # A 200 alone means nothing here: Meteor's proxy answers 200 with an
+          # HTML error page while the server bundle is crashed.
+          curl -sS -o /dev/null -w 'GET / -> %{http_code} %{content_type}\n' http://localhost:3000/
+
+      # Four suites, four questions, each its own step so a failure names itself.
+      # `if: always()` keeps the later ones running so one push gives full signal.
+      - name: smoke — does it run
+        run: node tools/smoke.mjs http://localhost:3000 --seconds=8 --screenshot=/tmp/shot-smoke.png
+
+      - name: feel — does it play right
+        if: always()
+        run: node tools/feel.mjs http://localhost:3000 --screenshot=/tmp/shot-feel.png
+
+      - name: scores — does it persist
+        if: always()
+        run: node tools/scores.mjs http://localhost:3000
+
+      - name: settings — does it configure
+        if: always()
+        run: node tools/settings.mjs http://localhost:3000
+
+      # Only minutes are free; storage is billed per GB-hour. A short retention
+      # keeps a screenshot trail without accruing a bill nobody asked for.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoppa-screenshots
+          path: /tmp/shot-*.png
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -80 /tmp/meteor.log || true
+
+      - name: Stop the app
+        if: always()
+        run: |
+          pkill -f "meteor run" || true
+          pkill -f mongod || true
