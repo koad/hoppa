@@ -22,9 +22,9 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 22 detects ESM in .js files, so `node --check` can cover the entry
           # files as well as the plain-script modules.
@@ -108,7 +108,7 @@ jobs:
       # keeps a screenshot trail without accruing a bill nobody asked for.
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hoppa-screenshots
           path: /tmp/shot-*.png
