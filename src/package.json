@@ -1,0 +1,21 @@
+{
+  "name": "src",
+  "private": true,
+  "scripts": {
+    "start": "meteor run"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.23.5",
+    "body-parser": "^1.12.4",
+    "geoip-lite": "^1.2.1",
+    "meteor-node-stubs": "^1.2.30",
+    "node-machine-id": "^1.1.12",
+    "path-to-regexp": "^6.2.1",
+    "signale": "^1.4.0",
+    "ssh2": "^1.14.0",
+    "systeminformation": "^5.11.14",
+    "ua-parser-js": "^1.0.35",
+    "useragent": "^2.3.0",
+    "web-vitals": "^3.0.4"
+  }
+}

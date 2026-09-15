@@ -1,0 +1,37 @@
+<head>
+  <title>HOPPA</title>
+
+  <!-- mobile-first: lock the viewport, avoid double-tap zoom, respect notches -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="color-scheme" content="dark">
+
+  <!-- PWA / installability -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- iOS standalone behaviour -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HOPPA">
+</head>
+
+<template name="ApplicationHome">
+  <div class="hoppa" id="hoppa">
+    <canvas class="hoppa__canvas" id="hoppa-canvas"></canvas>
+
+    <div class="hoppa__hud">
+      <span class="hoppa__score" id="hoppa-score">0</span>
+      <span class="hoppa__best" id="hoppa-best">best 0</span>
+    </div>
+
+    <div class="hoppa__overlay" id="hoppa-overlay">
+      <h1 class="hoppa__title">HOPPA</h1>
+      <p class="hoppa__sub" id="hoppa-sub">a koad:io mobile rig</p>
+      <p class="hoppa__cta" id="hoppa-cta">tap to start</p>
+      <p class="hoppa__hint">tap to jump &middot; hold to jump higher</p>
+    </div>
+  </div>
+</template>
