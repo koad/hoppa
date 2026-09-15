@@ -279,6 +279,185 @@ body > * { margin: 0; }
 .hoppa__pts { margin-left: auto; font-weight: 700; }
 .hoppa__empty { font-size: clamp(10px, 3vw, 12px); opacity: 0.4; }
 
+/* --- landscape ----------------------------------------------------------
+   The engine keeps the play area playable by widening the world rather than
+   shortening it, so this only has to rescue the TEXT: the overlay carries
+   ~500px of content and a landscape phone offers ~390px of height.
+   ------------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .hoppa__overlay {
+    justify-content: flex-start;
+    overflow-y: auto;
+    gap: 4px;
+    padding-top: calc(var(--safe-t) + 10px);
+    padding-bottom: calc(var(--safe-b) + 10px);
+  }
+
+  .hoppa__title { font-size: clamp(24px, 6vw, 38px); letter-spacing: 0.1em; }
+  .hoppa__sub { display: none; }
+  .hoppa__cta { margin-top: 4px; font-size: clamp(13px, 2.6vw, 16px); }
+
+  .hoppa__entry { gap: 4px; margin-top: 2px; }
+  .hoppa__entry-label { font-size: 10px; letter-spacing: 0.12em; }
+  .hoppa__slots { gap: 8px; }
+  .hoppa__letter { font-size: clamp(20px, 5vw, 28px); }
+  .hoppa__arrow { min-height: 24px; padding: 2px 0; }
+  .hoppa__enter { min-height: 34px; padding: 6px 18px; }
+
+  .hoppa__board { gap: 16px; margin-top: 2px; }
+  .hoppa__col { min-width: 92px; }
+  .hoppa__row { font-size: 11px; }
+
+  .hoppa__hint { font-size: 10px; }
+  /* only the key line survives: the rest is chrome once the screen is short */
+  .hoppa__hint:not(.hoppa__hint--key) { display: none; }
+
+  .hoppa__score { font-size: clamp(18px, 4vw, 26px); }
+  .hoppa__fx { bottom: calc(var(--safe-b) + 6px); font-size: 10px; }
+
+  .hoppa__panel { max-width: 460px; gap: 10px; padding: 14px; }
+  .hoppa__video { max-height: 120px; }
+}
+
+/* --- settings ----------------------------------------------------------- */
+
+.hoppa__gear {
+  position: absolute;
+  top: calc(var(--safe-t) + 10px);
+  right: calc(var(--safe-r) + 10px);
+  z-index: 5;
+  pointer-events: auto;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  opacity: 0.38;
+  font-size: 21px;
+  line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hoppa__gear:active { opacity: 1; }
+
+.hoppa__settings {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 16px);
+  background: rgba(4, 7, 16, 0.82);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hoppa__panel {
+  width: 100%;
+  max-width: 340px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(11, 16, 32, 0.97);
+}
+
+.hoppa__panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.hoppa__field { display: flex; flex-direction: column; gap: 8px; }
+
+.hoppa__field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.hoppa__field-label em { font-style: normal; opacity: 0.55; }
+
+.hoppa__swatches { display: flex; gap: 10px; }
+
+.hoppa__swatch {
+  appearance: none;
+  width: 54px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hoppa__swatch.is-active { border-color: #ffffff; }
+
+.hoppa__range { width: 100%; accent-color: var(--accent); }
+
+.hoppa__face { display: flex; align-items: center; gap: 12px; }
+
+.hoppa__face-preview {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background-color: rgba(255, 255, 255, 0.06);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.hoppa__face-actions { display: flex; flex-direction: column; gap: 6px; }
+
+.hoppa__btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 36px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hoppa__btn:active { background: rgba(255, 255, 255, 0.14); }
+
+.hoppa__video {
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+}
+
+.hoppa__face-note {
+  margin: 0;
+  min-height: 1em;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
 /* --- overlays ----------------------------------------------------------- */
 
 .hoppa__overlay {

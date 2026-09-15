@@ -76,5 +76,41 @@
       <p class="hoppa__hint">tap to hop &middot; hold for higher &middot; tap again in the air</p>
       <p class="hoppa__hint">tilt to steer &middot; points come only from airtime</p>
     </div>
+
+    <!-- settings. The gear lives outside the overlay so it is reachable while the
+         overlay is hidden, i.e. mid-run; opening it pauses the game. -->
+    <button type="button" class="hoppa__gear" id="hoppa-gear" aria-label="settings">&#9881;</button>
+
+    <div class="hoppa__settings" id="hoppa-settings" hidden>
+      <div class="hoppa__panel">
+        <h2 class="hoppa__panel-title">settings</h2>
+
+        <div class="hoppa__field">
+          <span class="hoppa__field-label">theme</span>
+          <div class="hoppa__swatches" id="hoppa-themes"></div>
+        </div>
+
+        <div class="hoppa__field">
+          <span class="hoppa__field-label">tilt sensitivity <em id="hoppa-sens-val">1.0x</em></span>
+          <input type="range" class="hoppa__range" id="hoppa-sens" min="0.4" max="3" step="0.1" value="1">
+        </div>
+
+        <div class="hoppa__field">
+          <span class="hoppa__field-label">put your face on the hoppa</span>
+          <div class="hoppa__face">
+            <div class="hoppa__face-preview" id="hoppa-face-preview"><span>&#9786;</span></div>
+            <div class="hoppa__face-actions">
+              <button type="button" class="hoppa__btn" id="hoppa-face-take">camera</button>
+              <button type="button" class="hoppa__btn" id="hoppa-face-shot" hidden>capture</button>
+              <button type="button" class="hoppa__btn" id="hoppa-face-clear" hidden>clear</button>
+            </div>
+          </div>
+          <video class="hoppa__video" id="hoppa-video" playsinline muted hidden></video>
+          <p class="hoppa__face-note" id="hoppa-face-note"></p>
+        </div>
+
+        <button type="button" class="hoppa__enter" id="hoppa-settings-close">done</button>
+      </div>
+    </div>
   </div>
 </template>

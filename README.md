@@ -14,6 +14,7 @@ Android and iOS builds from GitHub Actions.
 │   ├── server/scores.js       validation, rate limiting, the two boards
 │   ├── client/logic.js        game engine — canvas, physics, no dependencies
 │   ├── client/scores.js       arcade initials entry + leaderboard rendering
+│   ├── client/settings.js     gear menu: theme, tilt sensitivity, selfie face
 │   ├── client/styles.css      mobile shell: full-bleed, no scroll/zoom, notch-safe
 │   ├── client/templates.html  Blaze mount + PWA/Apple head tags
 │   └── public/                manifest.webmanifest, sw.js, generated icons
@@ -22,7 +23,8 @@ Android and iOS builds from GitHub Actions.
 │   ├── cdp.mjs                dependency-free Chrome DevTools Protocol client
 │   ├── smoke.mjs              does it run
 │   ├── feel.mjs               does it PLAY right — asserts every mechanic below
-│   └── scores.mjs             does it PERSIST — drives the board end to end
+│   ├── scores.mjs             does it PERSIST — drives the board end to end
+│   └── settings.mjs           does it CONFIGURE — theme, sensitivity, real camera
 └── capacitor.config.js        STAGED, not live — see the warning below
 ```
 
@@ -40,7 +42,7 @@ bounce, run into the side and you are done.
 | tap | short hop (~85u) |
 | tap and hold | higher, up to ~160u — longer hold, higher jump |
 | tap again in the air | double jump (more after collecting +jump orbs) |
-| tilt the device left / right | HOPPA slides left / right for control |
+| tilt the device left / right | HOPPA slides — with the device LEVEL it sits dead centre |
 
 ### The circles
 
@@ -59,6 +61,29 @@ draws an aura on the player so an active effect is never invisible.
 clock. That re-frames the whole game — you want to be airborne, high, and for as
 long as possible — and it is what makes the floaters interesting, because they
 occupy exactly the air you want. Rainbow bounces pay a flat bonus on top.
+
+## Settings — the gear
+
+A pause menu: opening it stops the run, and no input reaches the game while it
+is up.
+
+| control | what it does |
+|---|---|
+| theme | midnight / sunset / forest / neon. Scenery and player only — the **hazard palette is deliberately fixed**, because "squares hurt, circles help" is the whole instruction set and a theme must never blur it. |
+| tilt sensitivity | 0.4x – 3x. Higher reacts to a smaller tilt. |
+| your face on the hoppa | opens the camera, centre-crops to a square, and draws the shot clipped into the hoppa |
+
+All of it persists in localStorage and is re-applied on load.
+
+## Orientation
+
+The app detects portrait/landscape and adapts, rather than nagging you to rotate.
+A landscape phone would otherwise leave a **~185-unit play area** — every jump
+would exit the screen. So the engine keeps a height floor: when the viewport is
+too short it makes the world *wider* instead of shorter, and `wScale` re-times
+the scroll so a corridor still takes the same number of seconds to cross.
+Difficulty is therefore orientation-independent, and both orientations are
+properly playable (measured: `logicalH=320`, `viewW=693`, `wScale=1.731`).
 
 ## Leaderboard
 
@@ -83,13 +108,14 @@ meteor run              # http://localhost:3000
 
 ## Test it
 
-Three tools, three different questions. All dependency-free, all drive real
-headless Chrome over CDP.
+Four tools, four different questions. All dependency-free, all drive real headless
+Chrome over CDP, all assert on the RUNTIME.
 
 ```bash
-node tools/smoke.mjs  https://hoppa.koad.sh    # does it run
-node tools/feel.mjs   https://hoppa.koad.sh    # does it play right
-node tools/scores.mjs https://hoppa.koad.sh    # does it persist
+node tools/smoke.mjs    https://hoppa.koad.sh   # does it run
+node tools/feel.mjs     https://hoppa.koad.sh   # does it play right
+node tools/scores.mjs   https://hoppa.koad.sh   # does it persist
+node tools/settings.mjs https://hoppa.koad.sh   # does it configure
 ```
 
 - **smoke** — shell served, game mounted, a synthetic **touch** starts it,
@@ -101,6 +127,10 @@ node tools/scores.mjs https://hoppa.koad.sh    # does it persist
 - **scores** — drives the real initials buttons, submits over real DDP, and
   confirms the row count on the server went up. Also asserts the server *rejects*
   bad initials and absurd scores.
+- **settings** — opens the gear, switches theme, moves the sensitivity slider,
+  and takes a selfie through a **fake camera** (`--use-fake-device-for-media-stream`),
+  so getUserMedia → centre-crop → JPEG → engine texture is exercised for real.
+  Then it reloads and checks all of it persisted.
 
 `feel.mjs` reads its numbers from the live page, so it cannot drift from the
 engine. A feature that exists in the source but not in the physics is not a

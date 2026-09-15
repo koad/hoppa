@@ -57,6 +57,11 @@ const Hoppa = (() => {
     clusterGapMin: 0.10,         // SECONDS between members, so difficulty holds
     clusterGapMax: 0.20,         // as the scroll speeds up (a pixel gap would get easier)
     groundH: 84,
+    // Height floor for the visible play area. When the viewport is too short to
+    // honour it (any landscape phone), the world gets WIDER instead of shorter,
+    // and `wScale` re-times the scroll so a corridor still takes the same number
+    // of seconds to cross. Difficulty is therefore orientation-independent.
+    minLogicalH: 320,
     // Scoring: points come ONLY from airtime, in proportion to height. This
     // re-frames the whole game — you want to be airborne, high, and for as long
     // as possible. What stops that being free is the floaters, which occupy the
@@ -71,14 +76,17 @@ const Hoppa = (() => {
     springJump: 1.25,            // jump impulse multiplier while spring is up
     springBounce: 1.18,          // rainbow bounce multiplier
     springDuration: 6,
-    // Lateral control by device tilt. `playerX` is the level-device rest
-    // position; tiltTravel is how far a full tilt slides it.
-    playerX: 70,
-    playerXMin: 16,
-    playerXMax: 146,
-    tiltTravel: 70,
+    // Lateral control by device tilt. With the device LEVEL (gamma near 0) HOPPA
+    // sits in the MIDDLE of the corridor — koad's call, and it makes tilt the
+    // primary verb rather than a nudge. Retreating left buys reaction time;
+    // there is deliberately less room to the right, so pushing forward is the
+    // riskier choice.
+    playerX: 200,                // level-device rest = centre of the corridor
+    playerXMin: 32,
+    playerXMax: 250,
+    tiltTravel: 160,             // how far a full tilt slides it
     tiltDeadzone: 3,             // degrees of slop before it reacts
-    tiltRange: 20,               // degrees of tilt for full deflection
+    tiltRange: 20,               // degrees of tilt for full deflection (at sens 1)
     tiltSmooth: 420,             // units/s the player slides laterally
     tiltInvert: false,           // flip if left/right feels backwards on a device
     playerW: 30,
@@ -144,6 +152,49 @@ const Hoppa = (() => {
     bloodDeep: '#7d0f1e',
     bloodLight: '#e8556b'
   };
+
+  /* Themes. Only the scenery and the player change — the HAZARD palette stays
+   * fixed on purpose, because "squares hurt, circles help" is the entire
+   * instruction set and a theme must never blur it. */
+  const THEMES = {
+    midnight: { sky0: '#0b1020', sky1: '#141d38', hillFar: '#182443', hillNear: '#1d2b50',
+                ground: '#243357', lip: '#57e2c8', player: '#57e2c8', ink: '#06202a',
+                accent: '#57e2c8', warn: '#ffb454', bg: '#0b1020', text: '#e8f0ff' },
+    sunset:   { sky0: '#2a1230', sky1: '#5c2540', hillFar: '#3d1c38', hillNear: '#4e2440',
+                ground: '#3a1f3a', lip: '#ffb454', player: '#ffb454', ink: '#3a1a06',
+                accent: '#ff8a5c', warn: '#ffd166', bg: '#2a1230', text: '#ffe9d6' },
+    forest:   { sky0: '#06140f', sky1: '#103024', hillFar: '#0c2018', hillNear: '#143026',
+                ground: '#17352a', lip: '#6ee7a8', player: '#a8e6a0', ink: '#04231a',
+                accent: '#6ee7a8', warn: '#ffd166', bg: '#06140f', text: '#e2fff2' },
+    neon:     { sky0: '#150a2e', sky1: '#2b1050', hillFar: '#241047', hillNear: '#301659',
+                ground: '#2a1550', lip: '#ff5cf0', player: '#ff5cf0', ink: '#2a0630',
+                accent: '#ff5cf0', warn: '#ffd166', bg: '#150a2e', text: '#f7e9ff' }
+  };
+  const THEME_KEYS = Object.keys(THEMES);
+
+  /** Push a theme into the canvas palette and the CSS custom properties, so the
+   *  DOM chrome (HUD, overlays, board) moves with the canvas. */
+  function applyTheme(name) {
+    const t = THEMES[name] || THEMES.midnight;
+    COLORS.sky0 = t.sky0;
+    COLORS.sky1 = t.sky1;
+    COLORS.hillFar = t.hillFar;
+    COLORS.hillNear = t.hillNear;
+    COLORS.ground = t.ground;
+    COLORS.groundLip = t.lip;
+    COLORS.player = t.player;
+    COLORS.playerInk = t.ink;
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const root = document.documentElement.style;
+      root.setProperty('--bg', t.bg);
+      root.setProperty('--ink', t.text);
+      root.setProperty('--accent', t.accent);
+      root.setProperty('--warn', t.warn);
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', t.bg);
+    }
+    return name in THEMES ? name : 'midnight';
+  }
 
   /* --- tiny helpers ------------------------------------------------------ */
 
@@ -229,7 +280,7 @@ const Hoppa = (() => {
     const sfx = makeBlipper();
 
     // view state
-    let scale = 1, dpr = 1, logicalH = 800, groundY = 0;
+    let scale = 1, dpr = 1, logicalH = 800, groundY = 0, viewW = 400, wScale = 1;
     let paused = false, raf = 0, lastT = 0;
 
     // game state
@@ -242,6 +293,9 @@ const Hoppa = (() => {
     let airScore = 0, airJumpStock = 1, wasScoring = false;
     // orb effects, in game-clock seconds
     let slowUntil = 0, springUntil = 0, effSpeed = TUNING.speedStart, hudFx = '';
+    let worldDrift = 0;   // how fast scenery and gore move; 0 once you are dead
+    let tiltSens = 1;     // settings: higher = reacts to a smaller tilt
+    let faceImg = null;   // settings: the player's own face, if they gave us one
     let obstacles = [], dust = [], rings = [], shake = 0;
     // death gore: an expanding puddle plus flying droplets, both anchored to the
     // world so they scroll away with the ground rather than hanging in the air
@@ -285,7 +339,14 @@ const Hoppa = (() => {
       const cssW = root.clientWidth || window.innerWidth;
       const cssH = root.clientHeight || window.innerHeight;
       dpr = clamp(window.devicePixelRatio || 1, 1, 3);
-      scale = cssW / LOGICAL_W;
+      // Fit the nominal 400-unit corridor to the width, but never let the visible
+      // height fall below minLogicalH — otherwise a landscape phone leaves only a
+      // ~185-unit play area and every jump exits the screen.
+      const fitW = cssW / LOGICAL_W;
+      const fitH = cssH / TUNING.minLogicalH;
+      scale = Math.min(fitW, fitH);
+      wScale = Math.max(1, (cssW / scale) / LOGICAL_W);
+      viewW = LOGICAL_W * wScale;
 
       canvas.width = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
@@ -295,9 +356,10 @@ const Hoppa = (() => {
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 
       player.y = groundY - player.h;
+      player.x = clamp(player.x, TUNING.playerXMin * wScale, TUNING.playerXMax * wScale);
 
       stars = Array.from({ length: 46 }, () => ({
-        x: rand(0, LOGICAL_W), y: rand(0, logicalH * 0.72),
+        x: rand(0, viewW), y: rand(0, logicalH * 0.72),
         r: rand(0.5, 1.5), a: rand(0.15, 0.7)
       }));
       hills = [
@@ -309,6 +371,8 @@ const Hoppa = (() => {
     /* --- input ----------------------------------------------------------- */
 
     function press() {
+      // settings is a pause menu: no input should reach the game while it is up
+      if (globalThis.HoppaSettings && HoppaSettings.isOpen && HoppaSettings.isOpen()) return;
       // never restart the run while the arcade initials entry is up: the player
       // is tapping letters, not the canvas
       if (state === 'over' && globalThis.HoppaScoreUI && HoppaScoreUI.isEntryOpen && HoppaScoreUI.isEntryOpen()) return;
@@ -439,7 +503,8 @@ const Hoppa = (() => {
     function tiltToUnit(deg) {
       const a = Math.abs(deg);
       if (a <= TUNING.tiltDeadzone) return 0;
-      const t = Math.min(1, (a - TUNING.tiltDeadzone) / TUNING.tiltRange);
+      const range = Math.max(2, TUNING.tiltRange / Math.max(0.2, tiltSens));
+      const t = Math.min(1, (a - TUNING.tiltDeadzone) / range);
       return Math.sign(deg) * t;
     }
 
@@ -452,9 +517,11 @@ const Hoppa = (() => {
       else want = tiltKey;
 
       tiltInput = clamp(want, -1, 1);
-      const target = clamp(TUNING.playerX + tiltInput * TUNING.tiltTravel,
-        TUNING.playerXMin, TUNING.playerXMax);
-      const step = TUNING.tiltSmooth * dt;
+      // ranges are expressed for the 400-unit corridor and scaled with it, so the
+      // control feels the same in either orientation
+      const target = clamp((TUNING.playerX + tiltInput * TUNING.tiltTravel) * wScale,
+        TUNING.playerXMin * wScale, TUNING.playerXMax * wScale);
+      const step = TUNING.tiltSmooth * wScale * dt;
       player.x += clamp(target - player.x, -step, step);
     }
 
@@ -573,7 +640,7 @@ const Hoppa = (() => {
       const forced = (ONLY && TYPES[ONLY]) ? ONLY : null;
       const type = forced || pendingType || weightedType();
       const first = makeObstacle(type);
-      first.x = LOGICAL_W + 20;
+      first.x = viewW + 20;
       obstacles.push(first);
 
       // Clusters: a tight run of boxes, threaded with one long jump or with air
@@ -637,9 +704,17 @@ const Hoppa = (() => {
 
     function update(dt) {
       clock += dt;
-      updateLateral(dt);
-      effSpeed = speed * (slowActive() ? TUNING.slowFactor : 1);
-      const drift = state === 'playing' ? effSpeed : TUNING.speedStart * 0.45;
+      // Lateral control is frozen once you are dead: otherwise the tilt keeps
+      // sliding the body out of its own blood pool, which koad caught.
+      if (state === 'ready' || state === 'playing') updateLateral(dt);
+      effSpeed = speed * wScale * (slowActive() ? TUNING.slowFactor : 1);
+      // The world STOPS when you die. It used to keep drifting at 45%, which slid
+      // the blood puddle off screen while the player watched it — koad reported
+      // exactly that. Gore rides on worldDrift, so it now holds its ground.
+      const drift = state === 'playing'
+        ? effSpeed
+        : (state === 'ready' ? TUNING.speedStart * 0.45 * wScale : 0);
+      worldDrift = drift;
       scroll += drift * dt;
 
       for (const h of hills) h.off += drift * h.spd * dt;
@@ -805,7 +880,7 @@ const Hoppa = (() => {
       for (const r of rings) r.t += dt;
       rings = rings.filter((r) => r.t < r.life);
 
-      const slide = effSpeed * dt;          // gore is stuck to the ground
+      const slide = worldDrift * dt;        // gore is stuck to the ground
       for (const b of blood) {
         b.t += dt;
         b.x += b.vx * dt - slide;
@@ -827,7 +902,7 @@ const Hoppa = (() => {
       g.addColorStop(0, COLORS.sky0);
       g.addColorStop(1, COLORS.sky1);
       ctx.fillStyle = g;
-      ctx.fillRect(0, 0, LOGICAL_W, logicalH);
+      ctx.fillRect(0, 0, viewW, logicalH);
 
       ctx.fillStyle = COLORS.star;
       for (const s of stars) {
@@ -844,14 +919,14 @@ const Hoppa = (() => {
         ctx.fillStyle = h.col;
         ctx.beginPath();
         ctx.moveTo(0, h.y);
-        const n = Math.ceil(LOGICAL_W / h.step) + 2;
+        const n = Math.ceil(viewW / h.step) + 2;
         const shift = -((h.off % h.step) + h.step);
         for (let i = 0; i <= n; i++) {
           const x = shift + i * h.step;
           ctx.lineTo(x, h.y - h.amp);
           ctx.lineTo(x + h.step / 2, h.y);
         }
-        ctx.lineTo(LOGICAL_W, logicalH);
+        ctx.lineTo(viewW, logicalH);
         ctx.lineTo(0, logicalH);
         ctx.closePath();
         ctx.fill();
@@ -860,7 +935,7 @@ const Hoppa = (() => {
 
     function drawGround() {
       ctx.fillStyle = COLORS.ground;
-      ctx.fillRect(0, groundY, LOGICAL_W, logicalH - groundY);
+      ctx.fillRect(0, groundY, viewW, logicalH - groundY);
 
       const off = scroll % 26;
       ctx.strokeStyle = COLORS.groundLip;
@@ -868,11 +943,11 @@ const Hoppa = (() => {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, groundY + 1);
-      ctx.lineTo(LOGICAL_W, groundY + 1);
+      ctx.lineTo(viewW, groundY + 1);
       ctx.stroke();
       ctx.globalAlpha = 0.22;
       ctx.beginPath();
-      for (let x = -off; x < LOGICAL_W; x += 26) {
+      for (let x = -off; x < viewW; x += 26) {
         ctx.moveTo(x, groundY + 12);
         ctx.lineTo(x + 11, groundY + 12);
       }
@@ -979,24 +1054,45 @@ const Hoppa = (() => {
         ctx.globalAlpha = 1;
       }
 
+      // If the player gave us a selfie, that IS the hoppa. Clipped to the same
+      // rounded box and ringed in the theme colour so it still reads as a piece
+      // rather than a photo pasted on the canvas.
+      const hasFace = !!(faceImg && faceImg.complete && faceImg.naturalWidth);
+
       rounded(ctx, player.x, player.y, player.w, player.h, 8);
-      ctx.fillStyle = COLORS.player;
-      ctx.fill();
+      if (hasFace) {
+        ctx.save();
+        rounded(ctx, player.x, player.y, player.w, player.h, 8);
+        ctx.clip();
+        ctx.drawImage(faceImg, player.x, player.y, player.w, player.h);
+        ctx.restore();
+        rounded(ctx, player.x, player.y, player.w, player.h, 8);
+        ctx.strokeStyle = COLORS.player;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = COLORS.player;
+        ctx.fill();
+      }
 
       ctx.fillStyle = COLORS.playerInk;
       const ex = player.x + player.w - 11;
       const ey = player.y + 10;
       if (state === 'dying') {
         ctx.lineWidth = 2;
-        ctx.strokeStyle = COLORS.playerInk;
+        // X eyes in white over a face, otherwise they vanish into skin tones
+        ctx.strokeStyle = hasFace ? '#ffffff' : COLORS.playerInk;
         ctx.beginPath();
         ctx.moveTo(ex - 3, ey - 3); ctx.lineTo(ex + 3, ey + 3);
         ctx.moveTo(ex + 3, ey - 3); ctx.lineTo(ex - 3, ey + 3);
         ctx.stroke();
       } else {
-        ctx.beginPath();
-        ctx.arc(ex, ey, 2.6, 0, Math.PI * 2);
-        ctx.fill();
+        // the eye is meaningless on a real face
+        if (!hasFace) {
+          ctx.beginPath();
+          ctx.arc(ex, ey, 2.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
         // one dot per banked air jump, so orb upgrades are legible at a glance
         const n = Math.min(jumpsLeft, TUNING.airJumpMax);
         if (!onGround && n > 0) {
@@ -1079,7 +1175,7 @@ const Hoppa = (() => {
       if (slowActive()) {
         ctx.globalAlpha = 0.10;
         ctx.fillStyle = ORBS.slow.color;
-        ctx.fillRect(0, 0, LOGICAL_W, logicalH);
+        ctx.fillRect(0, 0, viewW, logicalH);
         ctx.globalAlpha = 1;
       }
       drawHills();
@@ -1138,7 +1234,13 @@ const Hoppa = (() => {
         slow: Math.max(0, Number((slowUntil - clock).toFixed(1))),
         spring: Math.max(0, Number((springUntil - clock).toFixed(1))),
         effSpeed: Math.round(effSpeed),
+        viewW: Math.round(viewW),
+        logicalH: Math.round(logicalH),
+        wScale: Number(wScale.toFixed(3)),
+        groundY: Math.round(groundY),
+        orientation: viewW > logicalH ? 'landscape' : 'portrait',
         apex: Math.round(statApex), onGround, jumpsLeft,
+        paused,
         height: Math.round((groundY - player.h) - player.y),
         obstacles: obstacles.length,
         types: Object.assign({}, statTypes),
@@ -1149,6 +1251,33 @@ const Hoppa = (() => {
       }),
       typeWeights: () => TYPES,
       tuning: () => TUNING,
+      themes: () => THEMES,
+      setTheme(name) {
+        const applied = applyTheme(name);
+        resize();                    // hills cache their colour, so re-derive
+        return applied;
+      },
+      setTiltSensitivity(v) {
+        tiltSens = clamp(Number(v) || 1, 0.4, 3);
+        return tiltSens;
+      },
+      /** Settings opens over a live run, so it needs to stop the simulation
+       *  without pretending the tab was hidden. */
+      setPaused(v) {
+        paused = !!v;
+        if (!paused) lastT = 0;      // drop the gap so there is no time jump
+        return paused;
+      },
+      /** data URL from the settings page; null clears it. */
+      setFace(dataUrl) {
+        if (!dataUrl) { faceImg = null; return false; }
+        const img = new Image();
+        img.src = dataUrl;
+        faceImg = img;
+        return true;
+      },
+      /** Whether a face texture is decoded and ready to draw. */
+      hasFace: () => !!(faceImg && faceImg.complete && faceImg.naturalWidth),
       // Test affordance: drive the lateral control with no gyro present.
       setTilt(v) { tiltTest = v == null ? null : clamp(v, -1, 1); return tiltTest; },
       invertTilt(on) { TUNING.tiltInvert = on == null ? !TUNING.tiltInvert : !!on; return TUNING.tiltInvert; },

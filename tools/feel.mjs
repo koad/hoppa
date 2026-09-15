@@ -227,6 +227,28 @@ try {
   check('level device parks in the middle', Math.abs(rest.playerX - T.playerX) < 2,
     `rest=${rest.playerX} expected ~${T.playerX}`);
 
+  /* ---- 8. landscape is genuinely playable ----------------------------- */
+  // The height floor is what makes this work. Without it a landscape phone gives
+  // a ~185-unit play area and every jump leaves the screen.
+  await session.send('Emulation.setDeviceMetricsOverride', {
+    width: 844, height: 390, deviceScaleFactor: 2, mobile: true
+  });
+  await load('sandbox=1&autostart=1');
+  const land = await stats();
+  check('landscape is detected', land.orientation === 'landscape', land.orientation);
+  check('landscape keeps a playable height', land.logicalH >= T.minLogicalH - 2,
+    `logicalH=${land.logicalH} (floor ${T.minLogicalH})`);
+  check('landscape widens the world instead', land.viewW > 400 && land.wScale > 1,
+    `viewW=${land.viewW} wScale=${land.wScale}`);
+  check('HOPPA stays on screen', land.playerX > 0 && land.playerX < land.viewW - 40,
+    `playerX=${land.playerX} viewW=${land.viewW}`);
+
+  await load('autopilot=1');
+  await sleep(9000);
+  const landRun = await stats();
+  check('it actually plays in landscape', landRun.score > 0,
+    `score=${landRun.score} orientation=${landRun.orientation} effSpeed=${landRun.effSpeed}`);
+
   console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} check(s) failed`);
 } catch (err) {
   console.error('\nfeel run aborted: ' + err.message);
