@@ -1,5 +1,7 @@
 # HOPPA — the koad:io mobile rig
 
+[![CI](https://github.com/koad/hoppa/actions/workflows/ci.yml/badge.svg)](https://github.com/koad/hoppa/actions/workflows/ci.yml)
+
 A one-tap jumping game, built as a **mobile-first PWA** that also runs as a
 **Capacitor** native app. This folder exists to learn how to build, test and ship
 Capacitor-based apps from a koad:io/Meteor codebase — and eventually to drive
