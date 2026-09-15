@@ -40,6 +40,10 @@ function saveInitials() {
 }
 
 let board = { allTime: [], recent: [], windowHours: CFG.WINDOW_HOURS };
+// `board` starts as a valid-looking empty object, so anything that waits on a
+// field of it passes vacuously before the server has answered. This says whether
+// a real response has landed.
+let boardLoaded = false;
 let entryOpen = false;
 let entryScore = 0;
 let pendingBounces = 0;
@@ -107,6 +111,7 @@ function renderBoard() {
 async function refreshBoard() {
   try {
     board = await Meteor.callAsync('hoppa.leaderboard');
+    boardLoaded = true;
     renderBoard();
   } catch (err) {
     // a dead server must never break the game
@@ -143,7 +148,7 @@ async function submit() {
     const res = await Meteor.callAsync('hoppa.submitScore', {
       initials: who, score: entryScore, bounces: pendingBounces
     });
-    if (res && res.board) { board = res.board; renderBoard(); }
+    if (res && res.board) { board = res.board; boardLoaded = true; renderBoard(); }
     else await refreshBoard();
     saveInitials();
     closeEntry();
@@ -226,8 +231,13 @@ globalThis.HoppaScoreUI = {
   refresh: refreshBoard,
   // test affordances for tools/scores.mjs
   _board: () => board,
+  _loaded: () => boardLoaded,
   _initials: initials,
   _remembered: () => loadInitials().map((i) => LETTERS[i]).join(''),
   _bump: bump,
-  _submit: submit
+  _submit: submit,
+  // the arcade gate is a RULE, so it is testable without writing a fake #1 to
+  // the real board — which a fixed test score eventually had to do
+  _qualifies: qualifies,
+  _openEntry: openEntry
 };

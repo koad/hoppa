@@ -1,1 +1,16 @@
-koad:io
+meteor-base
+mobile-experience
+mongo
+blaze-html-templates
+jquery
+reactive-var
+tracker
+standard-minifier-css
+standard-minifier-js
+es5-shim
+ecmascript
+typescript
+shell-server
+hot-module-replacement
+blaze-hot
+rspack

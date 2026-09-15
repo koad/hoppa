@@ -114,3 +114,12 @@
     </div>
   </div>
 </template>
+
+
+<!-- Without a router, this is what mounts the app. A single route did not justify
+     iron-router — and dropping it removes the last koad:io dependency, so the
+     app now builds from stock Atmosphere packages alone. -->
+<body>
+  {{> ApplicationHome}}
+</body>
+

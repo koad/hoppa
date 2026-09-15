@@ -1324,7 +1324,9 @@ const Hoppa = (() => {
 
 if (typeof Template !== 'undefined') {
   Template.ApplicationHome.onRendered(function () {
-    const el = this.$('#hoppa')[0] || document.getElementById('hoppa');
+    // getElementById rather than this.$: Blaze 3 no longer requires jQuery, and
+    // the app should not silently depend on it just to look up one node.
+    const el = document.getElementById('hoppa');
     if (!el || el.dataset.hoppaMounted === '1') return;
     el.dataset.hoppaMounted = '1';
 

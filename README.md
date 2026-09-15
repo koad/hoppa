@@ -10,13 +10,15 @@ Android and iOS builds from GitHub Actions.
 ```
 .
 ├── src/                       the Meteor app (this is what Capacitor will wrap)
-│   ├── both/scores.js         the score collection + shared config
-│   ├── server/scores.js       validation, rate limiting, the two boards
+│   ├── client/main.js         client entry — imports the rest, in order
 │   ├── client/logic.js        game engine — canvas, physics, no dependencies
 │   ├── client/scores.js       arcade initials entry + leaderboard rendering
 │   ├── client/settings.js     gear menu: theme, tilt sensitivity, selfie face
 │   ├── client/styles.css      mobile shell: full-bleed, no scroll/zoom, notch-safe
-│   ├── client/templates.html  Blaze mount + PWA/Apple head tags
+│   ├── client/templates.html  Blaze templates + PWA/Apple head tags
+│   ├── server/main.js         server entry
+│   ├── server/scores.js       validation, rate limiting, the two boards
+│   ├── both/scores.js         the score collection + shared config
 │   └── public/                manifest.webmanifest, sw.js, generated icons
 ├── tools/
 │   ├── make-icons.mjs         regenerates the PWA icons as real PNGs (no image deps)
@@ -182,8 +184,7 @@ cp capacitor.config.js src/          # commit it BEFORE the first native command
 
 Capacitor is not in any release. It lives on `meteor/meteor` branch
 `capacitor-integration` (PR #14633, still draft), so native builds require
-building the tool from that checkout. Full writeup:
-`~/.vulcan/assessments/2026-09-14-meteor-36-beta-mobile-rig.md`
+building the tool from that checkout.
 
 ## Next
 
@@ -192,12 +193,28 @@ building the tool from that checkout. Full writeup:
 3. real APK: needs `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64` + Gradle 8.11.1
 4. lift the three tools into GitHub Actions, then extend to iOS
 
-## App-owned npm dependencies
+## Stack — published packages only
 
-`koad:io-core`, `koad:io` and `koad:io-router` `require()` npm modules they do not
-declare in `Npm.depends()`; by convention the **app** supplies them. Without them
-the app cannot boot at all. Pinned to match the live reference app:
+The app runs on released Meteor with nothing but published Atmosphere packages
+and four npm dependencies. No `METEOR_PACKAGE_DIRS`, no vendored packages,
+nothing that exists on only one machine — which is what makes CI possible.
 
-`signale@1.4.0` · `ssh2@1.14.0` · `systeminformation@5.11.14` · `node-machine-id@1.1.12`
-`path-to-regexp@6.2.1` · `useragent@2.3.0` · `ua-parser-js@1.0.35` · `geoip-lite@1.2.1`
-`body-parser@1.12.4` · `web-vitals@3.0.4`
+```
+meteor-base  mongo  blaze-html-templates  jquery  tracker  ecmascript
+standard-minifier-css  standard-minifier-js  shell-server  es5-shim
+typescript  mobile-experience  reactive-var
+rspack  hot-module-replacement  blaze-hot
+```
+
+`package.json` declares the modern entry points (`meteor.mainModule.client` and
+`.server`) with `meteor.modern: true`, so the client is bundled by Rspack. Two
+consequences worth knowing:
+
+- With `mainModule` set, **only files reachable from an entry are loaded.** The
+  classic "everything under `client/` is auto-loaded" convention no longer
+  applies; `client/main.js` and `server/main.js` import the rest, in order.
+- This layout is not optional here. The earlier build appeared to work without
+  it because a private framework package pulled the bundler in transitively.
+  Standing on published packages alone requires the modern layout — the classic
+  loader serves loose package scripts in an order that leaves Blaze without
+  jQuery (`Uncaught Error: jQuery not found` at `blaze.js`).

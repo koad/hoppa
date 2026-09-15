@@ -77,25 +77,40 @@ try {
   }
 
   /* ---- 1. the board loads from the server ------------------------------ */
+  // Waits on the LOAD FLAG, not on a field of the default object: board starts
+  // as a valid-looking empty board, so checking a field passes vacuously.
   const loaded = await (async () => {
     for (let i = 0; i < 60; i++) {
-      const ok = await ev('!!(window.HoppaScoreUI._board() && window.HoppaScoreUI._board().windowHours)');
-      if (ok) return true;
+      if (await ev('window.HoppaScoreUI._loaded()')) return true;
       await sleep(250);
     }
     return false;
   })();
   check('leaderboard fetched from the server', loaded,
-    await ev('JSON.stringify(window.HoppaScoreUI._board().windowHours)'));
+    'windowHours=' + (await ev('window.HoppaScoreUI._board().windowHours')));
 
   const cols = await ev('JSON.stringify({all: !!document.getElementById("hoppa-alltime"), recent: !!document.getElementById("hoppa-recent")})');
   check('board columns rendered', /"all":true/.test(cols) && /"recent":true/.test(cols), cols);
   check('72h window is 72h', (await ev('window.HoppaScoreUI._board().windowHours')) === 72);
 
-  /* ---- 2. a qualifying score opens the entry --------------------------- */
-  await ev('window.HoppaScoreUI.gameOver(' + TEST_SCORE + ', 0)');
+  /* ---- 2. the arcade gate, and the entry it opens ---------------------- */
+  // The gate is tested on the RULE rather than by beating the real board: a
+  // fixed test score stopped qualifying once real scores filled the top 5, and
+  // writing a fake #1 just to make the test pass would be worse than the bug.
+  const boardNow = JSON.parse(await ev('JSON.stringify(window.HoppaScoreUI._board())'));
+  const allScores = (boardNow.allTime || []).concat(boardNow.recent || []);
+  const topScore = allScores.reduce((m, r) => Math.max(m, r.score), 0);
+  check('a low score does NOT qualify', (await ev('window.HoppaScoreUI._qualifies(1)')) === false);
+  check('a board-topping score DOES qualify',
+    (await ev('window.HoppaScoreUI._qualifies(' + (topScore + 1) + ')')) === true,
+    `top of board is ${topScore}`);
+  check('no entry is open before the run ends',
+    (await ev('window.HoppaScoreUI.isEntryOpen()')) === false);
+
+  // now drive the REAL UI through the entry it would have opened
+  await ev('window.HoppaScoreUI._openEntry(' + TEST_SCORE + ', 0)');
   await sleep(250);
-  check('qualifying run opens the initials entry', await ev('window.HoppaScoreUI.isEntryOpen()'));
+  check('the initials entry opens', await ev('window.HoppaScoreUI.isEntryOpen()'));
   check('entry is visible in the DOM', (await ev('document.getElementById("hoppa-entry").hidden')) === false);
   check('three letter slots exist', (await ev('document.querySelectorAll("[data-letter]").length')) === 3,
     await ev('window.HoppaScoreUI._initials()'));
@@ -155,8 +170,7 @@ try {
   }
   const remembered = await ev('window.HoppaScoreUI._remembered()');
   check('initials default to last time', remembered === TEST_INITIALS,
-    `remembered "${remembered}", wanted "${TEST_INITIALS}"`);
-  check('slots are prefilled with them', (await ev('window.HoppaScoreUI._initials()')) === TEST_INITIALS, await ev('window.HoppaScoreUI._initials()'));
+    `remembered "${remembered}", wanted "${TEST_INITIALS}"`);  check('slots are prefilled with them', (await ev('window.HoppaScoreUI._initials()')) === TEST_INITIALS, await ev('window.HoppaScoreUI._initials()'));
 
   console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} check(s) failed`);
   console.log(`(one row with initials ${TEST_INITIALS} was written — that is the evidence;`);
