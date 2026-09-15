@@ -100,7 +100,20 @@ try {
   const boardNow = JSON.parse(await ev('JSON.stringify(window.HoppaScoreUI._board())'));
   const allScores = (boardNow.allTime || []).concat(boardNow.recent || []);
   const topScore = allScores.reduce((m, r) => Math.max(m, r.score), 0);
-  check('a low score does NOT qualify', (await ev('window.HoppaScoreUI._qualifies(1)')) === false);
+
+  // The arcade rule has two halves. Once the board is full you must beat it;
+  // while it still has room, ANY score gets a slot — that is how a new board
+  // fills up. CI runs against an empty database, so asserting only the full-board
+  // half made the suite fail on a fresh board for behaving correctly.
+  const recentRows = (boardNow.recent || []).length;
+  const allRows = (boardNow.allTime || []).length;
+  const boardFull = recentRows >= 5 && allRows >= 5;
+  check(
+    boardFull
+      ? 'a low score does not qualify once the board is full'
+      : 'a low score qualifies while the board still has room',
+    (await ev('window.HoppaScoreUI._qualifies(1)')) === !boardFull,
+    `board rows: recent=${recentRows} allTime=${allRows}`);
   check('a board-topping score DOES qualify',
     (await ev('window.HoppaScoreUI._qualifies(' + (topScore + 1) + ')')) === true,
     `top of board is ${topScore}`);
