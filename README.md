@@ -176,24 +176,27 @@ cp capacitor.config.js src/          # commit it BEFORE the first native command
                                      # name and you ship `com.example.src`
 ```
 
-## The two tracks (they cannot be combined yet)
+## Native builds (Capacitor): WAIT
 
-| | Meteor 3.6-beta.0 | Capacitor |
-|---|---|---|
-| available | ✅ published 2026-09-10 | ⚠️ checkout branch only |
-| contains the other | ❌ | ❌ |
-| cost | clean upgrade | **downgrades 17 core packages** vs 3.5.2 |
+Read **[CAPACITOR.md](CAPACITOR.md)** before attempting anything native.
 
-Capacitor is not in any release. It lives on `meteor/meteor` branch
-`capacitor-integration` (PR #14633, still draft), so native builds require
-building the tool from that checkout.
+Short version: Capacitor is not in any Meteor release. It exists only on an
+unmerged draft branch, so producing an APK today would mean building the Meteor
+tool from that branch and accepting a downgrade of 17 core packages. That file
+holds the resume trigger, the full evidence, the playbook for when it ships, and
+the traps already paid for.
 
-## Next
+## Status
 
-1. add Capacitor (`meteor add capacitor` from the checkout tool), move the config in
-2. `meteor add platform android` → Gradle project at the app root
-3. real APK: needs `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64` + Gradle 8.11.1
-4. lift the three tools into GitHub Actions, then extend to iOS
+| | state |
+|---|---|
+| the game | ✅ done, live at https://hoppa.koad.sh |
+| four test suites | ✅ 71 checks |
+| CI on every push | ✅ green in ~1m40s, free runner |
+| **native build (APK/iOS)** | ⛔ **blocked upstream — see [CAPACITOR.md](CAPACITOR.md)** |
+
+The web side is finished. The native side cannot start: the Capacitor
+integration is unmerged upstream, so there is nothing to build against.
 
 ## Stack — published packages only
 
