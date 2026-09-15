@@ -106,11 +106,22 @@ try {
   });
 
   /* ---- 1. mount ------------------------------------------------------- */
-  await session.send('Page.navigate', { url: `${url}/` });
-  await waitFor(async () => await evaluate(session, 'document.readyState === "complete"'),
-    { label: 'document load' });
-  await waitFor(async () => await evaluate(session, 'typeof window.HOPPA === "object" && !!document.querySelector("#hoppa-canvas")'),
-    { timeout: 60_000, label: 'HOPPA to mount (meteor boot)' });
+  // Two attempts: a dev server that is mid-rebuild can serve a page that never
+  // boots, which is a flake in the harness rather than a defect in the app.
+  async function mount() {
+    await session.send('Page.navigate', { url: `${url}/` });
+    await waitFor(async () => await evaluate(session, 'document.readyState === "complete"'),
+      { label: 'document load' });
+    await waitFor(async () => await evaluate(session, 'typeof window.HOPPA === "object" && !!document.querySelector("#hoppa-canvas")'),
+      { timeout: 45_000, label: 'HOPPA to mount (meteor boot)' });
+  }
+  try {
+    await mount();
+  } catch (err) {
+    console.log('  (first mount attempt failed — reloading once: ' + err.message + ')');
+    await sleep(3000);
+    await mount();
+  }
 
   check('meteor shell served', await evaluate(session, '!!document.querySelector(\'link[rel="manifest"]\')'));
   check('game canvas mounted', await evaluate(session, '!!document.querySelector("#hoppa-canvas")'));

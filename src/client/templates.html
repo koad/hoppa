@@ -24,14 +24,57 @@
 
     <div class="hoppa__hud">
       <span class="hoppa__score" id="hoppa-score">0</span>
-      <span class="hoppa__best" id="hoppa-best">best 0</span>
+      <div class="hoppa__right">
+        <span class="hoppa__best" id="hoppa-best">best 0</span>
+        <span class="hoppa__air" id="hoppa-air">jumps x1</span>
+      </div>
     </div>
+    <div class="hoppa__fx" id="hoppa-fx"></div>
 
     <div class="hoppa__overlay" id="hoppa-overlay">
       <h1 class="hoppa__title">HOPPA</h1>
       <p class="hoppa__sub" id="hoppa-sub">a koad:io mobile rig</p>
       <p class="hoppa__cta" id="hoppa-cta">tap to start</p>
-      <p class="hoppa__hint">tap to jump &middot; hold to jump higher</p>
+
+      <!-- arcade initials entry: three letter slots and an ENTER. Shown only
+           when the run qualifies for the board. -->
+      <div class="hoppa__entry" id="hoppa-entry" hidden>
+        <p class="hoppa__entry-label">high score &mdash; enter initials</p>
+        <div class="hoppa__slots">
+          <div class="hoppa__slot">
+            <button type="button" class="hoppa__arrow" data-slot="0" data-dir="1" aria-label="letter up">&#9650;</button>
+            <span class="hoppa__letter" data-letter="0">A</span>
+            <button type="button" class="hoppa__arrow" data-slot="0" data-dir="-1" aria-label="letter down">&#9660;</button>
+          </div>
+          <div class="hoppa__slot">
+            <button type="button" class="hoppa__arrow" data-slot="1" data-dir="1" aria-label="letter up">&#9650;</button>
+            <span class="hoppa__letter" data-letter="1">A</span>
+            <button type="button" class="hoppa__arrow" data-slot="1" data-dir="-1" aria-label="letter down">&#9660;</button>
+          </div>
+          <div class="hoppa__slot">
+            <button type="button" class="hoppa__arrow" data-slot="2" data-dir="1" aria-label="letter up">&#9650;</button>
+            <span class="hoppa__letter" data-letter="2">A</span>
+            <button type="button" class="hoppa__arrow" data-slot="2" data-dir="-1" aria-label="letter down">&#9660;</button>
+          </div>
+        </div>
+        <button type="button" class="hoppa__enter" id="hoppa-enter">enter</button>
+      </div>
+
+      <!-- the board. Server-backed: all time, and the last 72 hours. -->
+      <div class="hoppa__board" id="hoppa-board" hidden>
+        <div class="hoppa__col">
+          <h2 class="hoppa__col-title">all time</h2>
+          <ol class="hoppa__list" id="hoppa-alltime"></ol>
+        </div>
+        <div class="hoppa__col">
+          <h2 class="hoppa__col-title">last 72h</h2>
+          <ol class="hoppa__list" id="hoppa-recent"></ol>
+        </div>
+      </div>
+
+      <p class="hoppa__hint hoppa__hint--key">avoid the squares &middot; collect the circles</p>
+      <p class="hoppa__hint">tap to hop &middot; hold for higher &middot; tap again in the air</p>
+      <p class="hoppa__hint">tilt to steer &middot; points come only from airtime</p>
     </div>
   </div>
 </template>
